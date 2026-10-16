@@ -391,7 +391,9 @@ def train(config: dict[str, Any]) -> dict[str, Any]:
                         train_loss=sum(micro_losses) / len(micro_losses),
                         validation_loss=last_validation_loss,
                         best_validation_loss=best_validation_loss,
-                        protected=True,
+                        # The durable best copy is protected; the step file
+                        # remains eligible for normal retention.
+                        protected=False,
                     )
                     _save_best(best_path, output_dir)
 
