@@ -28,4 +28,5 @@ outputs/reports/
 # Local notebook/runtime files
 .ipynb_checkpoints/
 kaggle_working/
+kaggle_upload/
 .DS_Store

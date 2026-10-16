@@ -209,6 +209,30 @@ weights.
 
 ## Training
 
+The locally prepared dataset used for the current run is under
+`data/tokenized/local_100m/tokens`; the tokenizer is
+`data/tokenized/local_100m/tokenizer.json`. The checked-in base configs point
+to these paths so, after uploading the corresponding directories to Kaggle,
+no YAML edit is needed if the repository is copied to `/kaggle/working/sslm`.
+
+Create the upload folder with:
+
+```bash
+bash scripts/create_kaggle_bundle.sh
+```
+
+This creates `kaggle_upload/sslm_bundle/` containing the tracked source files,
+`data/tokenized/local_100m/`, a `SOURCE_COMMIT`, and `SHA256SUMS`. It excludes
+raw and processed JSONL because the Kaggle trainer needs only the tokenizer and
+memory-mapped token shards. Upload that folder in Kaggle as a private Dataset
+named, for example, `sslm-bundle`.
+
+The generated bundle is about 190 MB for this run. Uploading it as one Dataset
+is simpler than maintaining separate code and data uploads. If you prefer
+separate uploads, upload the repository source as one Dataset and copy the
+contents of `data/tokenized/local_100m/` into the second Dataset at the same
+relative path.
+
 First validate the token manifest and model with the tiny config. A real run
 must have `data.token_manifest` pointing at the directory containing
 `manifest.json`, and the generation tokenizer path must point at
