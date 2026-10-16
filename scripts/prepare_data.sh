@@ -19,6 +19,7 @@ FINEWEB_LICENSE="${FINEWEB_LICENSE:-}"
 FINEWEB_EDU_LICENSE="${FINEWEB_EDU_LICENSE:-}"
 DOWNLOAD_BACKEND="${DOWNLOAD_BACKEND:-viewer_api}"
 VIEWER_PAGE_DELAY="${VIEWER_PAGE_DELAY:-0.25}"
+DOWNLOAD_RETRIES="${DOWNLOAD_RETRIES:-10}"
 
 download_args=()
 if [[ -n "${MAX_RECORDS}" ]]; then
@@ -36,6 +37,7 @@ python -m src.data.download_data \
   --revision "${FINEWEB_REVISION}" \
   --backend "${DOWNLOAD_BACKEND}" \
   --page-delay "${VIEWER_PAGE_DELAY}" \
+  --retries "${DOWNLOAD_RETRIES}" \
   --output-dir "${RAW_ROOT}/fineweb" \
   --max-tokens "${FINEWEB_TOKEN_BUDGET}" \
   "${download_args[@]}" "${fineweb_license_args[@]}"
@@ -47,6 +49,7 @@ python -m src.data.download_data \
   --revision "${FINEWEB_EDU_REVISION}" \
   --backend "${DOWNLOAD_BACKEND}" \
   --page-delay "${VIEWER_PAGE_DELAY}" \
+  --retries "${DOWNLOAD_RETRIES}" \
   --output-dir "${RAW_ROOT}/fineweb-edu" \
   --max-tokens "${FINEWEB_EDU_TOKEN_BUDGET}" \
   "${download_args[@]}" "${fineweb_edu_license_args[@]}"
