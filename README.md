@@ -233,6 +233,115 @@ separate uploads, upload the repository source as one Dataset and copy the
 contents of `data/tokenized/local_100m/` into the second Dataset at the same
 relative path.
 
+### Exact Kaggle run
+
+1. In Kaggle, create a **private Dataset** named `sslm-bundle` by uploading
+   the contents of the local folder `kaggle_upload/sslm_bundle/`. The Dataset
+   root must contain `src/`, `configs/`, and
+   `data/tokenized/local_100m/tokens/manifest.json`.
+2. Create a Kaggle Notebook, turn on a GPU accelerator, and attach the
+   `sslm-bundle` Dataset.
+3. Run this first notebook cell to copy the read-only input Dataset to a
+   writable working directory:
+
+```python
+from pathlib import Path
+import shutil, os, sys
+
+input_root = Path("/kaggle/input/sslm-bundle")
+if not (input_root / "src").is_dir():
+    matches = [p for p in Path("/kaggle/input").iterdir() if (p / "src").is_dir()]
+    if len(matches) != 1:
+        raise FileNotFoundError("Could not uniquely locate the uploaded sslm-bundle Dataset")
+    input_root = matches[0]
+
+project = Path("/kaggle/working/sslm")
+if project.exists():
+    shutil.rmtree(project)
+shutil.copytree(input_root, project)
+print(project)
+```
+
+4. Run this dependency cell. It intentionally does **not** replace Kaggle's
+   CUDA-enabled PyTorch:
+
+```python
+import sys, subprocess
+subprocess.run([
+    sys.executable, "-m", "pip", "install", "-q",
+    "numpy==1.26.4", "PyYAML==6.0.2", "tokenizers==0.19.1",
+    "tqdm==4.66.5", "pytest==8.3.5",
+], check=True)
+```
+
+5. Validate the uploaded files and run the offline smoke checks:
+
+```python
+!sha256sum -c data/tokenized/local_100m/SHA256SUMS
+!python -m pytest -q
+!python -m src.training.train --config configs/tiny.yaml --dry-run
+```
+
+6. Print the actual GPU and start the approximately 50M-parameter run:
+
+```python
+import torch
+print(torch.__version__, torch.cuda.is_available())
+if torch.cuda.is_available():
+    print(torch.cuda.get_device_name(0))
+    print(round(torch.cuda.get_device_properties(0).total_memory / 2**30, 2), "GiB")
+```
+
+```python
+!python -m src.training.train --config configs/base_50m.yaml
+```
+
+The prepared data contains **97,219,453 encoded tokens**, a 32,000-token
+vocabulary, and 512-token training windows. The default 50M configuration uses
+`8 * 512 * 8 = 32,768` effective tokens per optimizer step, or about 2,967
+steps for this dataset. Actual time is determined by the printed GPU
+throughput; no fixed time guarantee is made.
+
+7. Evaluate the best checkpoint and generate a sample:
+
+```python
+!python -m src.training.evaluate \
+  --checkpoint outputs/checkpoints/base_50m/best.pt \
+  --token-manifest data/tokenized/local_100m/tokens \
+  --max-batches 50 \
+  --output outputs/reports/base_50m-validation.json
+
+!python -m src.inference.generate \
+  --checkpoint outputs/checkpoints/base_50m/best.pt \
+  --tokenizer data/tokenized/local_100m/tokenizer.json \
+  --prompt "The history of computers" \
+  --device cuda --max-new-tokens 128
+```
+
+8. To resume after a session interruption, save the contents of
+   `outputs/checkpoints/base_50m/` as a second private Kaggle Dataset. In a
+   new notebook, attach both Datasets, copy the source bundle as above, then
+   copy the saved checkpoint directory into the working project:
+
+```python
+from pathlib import Path
+import shutil
+
+saved = next(p for p in Path("/kaggle/input").iterdir() if (p / "best.pt").is_file() or (p / "checkpoint_step_00000001.pt").is_file())
+for item in saved.iterdir():
+    target = destination / item.name
+    if item.is_dir():
+        shutil.copytree(item, target, dirs_exist_ok=True)
+    else:
+        shutil.copy2(item, target)
+```
+
+Then run the same training command. `resume: true` in
+`configs/base_50m.yaml` selects the latest valid atomic checkpoint. At the end
+of a session, save the output notebook version or publish the checkpoint folder
+as a new private Kaggle Dataset; `/kaggle/working` is not a guaranteed
+cross-session store by itself.
+
 First validate the token manifest and model with the tiny config. A real run
 must have `data.token_manifest` pointing at the directory containing
 `manifest.json`, and the generation tokenizer path must point at
