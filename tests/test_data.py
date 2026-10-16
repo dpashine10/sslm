@@ -166,6 +166,11 @@ def test_tokenizer_tokenization_and_random_windows_are_mmap_backed(tmp_path: Pat
     )
     assert tokenizer_manifest["train_files"]
     assert tokenizer_manifest["special_token_ids"]["<eos>"] is not None
+    from tokenizers import Tokenizer
+
+    trained_tokenizer = Tokenizer.from_file(str(tokenizer_dir / "tokenizer.json"))
+    known_text = "Alpha training document."
+    assert trained_tokenizer.decode(trained_tokenizer.encode(known_text).ids) == known_text
 
     token_dir = tmp_path / "tokens"
     token_manifest = tokenize_data(
