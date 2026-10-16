@@ -46,6 +46,87 @@ def _load_stream(
     return load_dataset(dataset, **kwargs)
 
 
+def _load_viewer_rows(
+    dataset: str,
+    *,
+    config: str | None,
+    split: str,
+    max_records: int | None,
+    max_tokens: int | None,
+    page_size: int = 100,
+    page_retries: int = 5,
+    timeout: float = 120.0,
+) -> Iterable[Mapping[str, Any]]:
+    """Read public rows through the Hugging Face Dataset Viewer API.
+
+    The viewer API is useful on networks where the dataset's signed object
+    storage hostname is unavailable. It is capped at 100 rows per request and
+    does not expose a revision parameter, so callers should record the API
+    backend and run date in the manifest. The regular ``datasets`` backend is
+    still preferred when it works.
+    """
+
+    try:
+        import requests
+    except ImportError as exc:  # pragma: no cover - project dependency normally provides it
+        raise RuntimeError("viewer_api backend requires requests") from exc
+    if page_size < 1 or page_size > 100:
+        raise ValueError("page_size must be in [1, 100]")
+    base_url = "https://datasets-server.huggingface.co/rows"
+    session = requests.Session()
+    offset = 0
+    records = 0
+    tokens = 0
+    while True:
+        params = {
+            "dataset": dataset,
+            "config": config or "default",
+            "split": split,
+            "offset": offset,
+            "length": page_size,
+        }
+        last_error: Exception | None = None
+        for attempt in range(page_retries):
+            try:
+                response = session.get(base_url, params=params, timeout=timeout)
+                response.raise_for_status()
+                payload = response.json()
+                rows = payload.get("rows")
+                if not isinstance(rows, list):
+                    raise ValueError(f"Dataset Viewer response has no rows list: {payload}")
+                break
+            except Exception as exc:  # network, JSON, and API errors are retryable per page
+                last_error = exc
+                if attempt + 1 >= page_retries:
+                    raise RuntimeError(
+                        f"Dataset Viewer request failed at offset {offset} after {page_retries} attempts: {exc}"
+                    ) from exc
+                time.sleep(min(30.0, 2**attempt))
+        else:  # pragma: no cover
+            raise RuntimeError(f"Dataset Viewer request failed: {last_error}")
+        if not rows:
+            break
+        for item in rows:
+            record = item.get("row") if isinstance(item, Mapping) else None
+            if not isinstance(record, Mapping):
+                continue
+            materialized = dict(record)
+            yield materialized
+            records += 1
+            record_tokens = materialized.get("token_count")
+            if not isinstance(record_tokens, (int, float)) or record_tokens <= 0:
+                text = materialized.get("text", "")
+                record_tokens = max(1, round(len(text) / 4)) if isinstance(text, str) else 1
+            tokens += int(record_tokens)
+            if max_records is not None and records >= max_records:
+                return
+            if max_tokens is not None and tokens >= max_tokens:
+                return
+        offset += len(rows)
+        if len(rows) < page_size:
+            break
+
+
 def download_dataset(
     dataset: str,
     output_dir: str | Path,
@@ -59,6 +140,8 @@ def download_dataset(
     retry_delay: float = 2.0,
     sample_size: int = 32,
     license_name: str | None = None,
+    backend: str = "datasets",
+    page_size: int = 100,
 ) -> dict[str, Any]:
     """Stream *dataset* to JSONL and return the written metadata.
 
@@ -75,6 +158,8 @@ def download_dataset(
         raise ValueError("max_tokens must be positive when provided")
     if sample_size < 1:
         raise ValueError("sample_size must be positive")
+    if backend not in {"datasets", "viewer_api"}:
+        raise ValueError("backend must be datasets or viewer_api")
 
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
@@ -89,7 +174,17 @@ def download_dataset(
             token_count = 0
             sample: list[dict[str, Any]] = []
             with temporary_path.open("w", encoding="utf-8") as handle:
-                stream = _load_stream(dataset, config=config, split=split, revision=revision)
+                if backend == "viewer_api":
+                    stream = _load_viewer_rows(
+                        dataset,
+                        config=config,
+                        split=split,
+                        max_records=max_records,
+                        max_tokens=max_tokens,
+                        page_size=page_size,
+                    )
+                else:
+                    stream = _load_stream(dataset, config=config, split=split, revision=revision)
                 for record in stream:
                     if not isinstance(record, Mapping):
                         raise ValueError(f"Dataset yielded a non-object record: {type(record).__name__}")
@@ -116,6 +211,12 @@ def download_dataset(
                 "revision": revision,
                 "license": license_name,
                 "license_note": "Review the dataset card; pass --license to record the reviewed identifier.",
+                "backend": backend,
+                "viewer_api_revision_note": (
+                    "Dataset Viewer API served current data; revision is not enforced by this backend."
+                    if backend == "viewer_api"
+                    else None
+                ),
                 "streaming": True,
                 "record_count": count,
                 "sample_size": len(sample),
@@ -151,6 +252,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--config", help="Optional dataset configuration/subset name.")
     parser.add_argument("--split", default="train", help="Dataset split to stream.")
     parser.add_argument("--revision", help="Optional dataset branch, tag, or commit.")
+    parser.add_argument(
+        "--backend",
+        choices=("datasets", "viewer_api"),
+        default="datasets",
+        help="Streaming backend. viewer_api avoids signed object-storage downloads on restricted networks.",
+    )
+    parser.add_argument("--page-size", type=int, default=100, help="Viewer API rows per request (maximum 100).")
     parser.add_argument("--output-dir", required=True, help="Directory for raw.jsonl and metadata.json.")
     parser.add_argument("--max-records", type=int, help="Stop after this many records; useful for smoke tests.")
     parser.add_argument(
@@ -185,6 +293,8 @@ def main(argv: list[str] | None = None) -> int:
         retry_delay=args.retry_delay,
         sample_size=args.sample_size,
         license_name=args.license_name,
+        backend=args.backend,
+        page_size=args.page_size,
     )
     print(json.dumps(metadata, ensure_ascii=False, indent=2, sort_keys=True))
     return 0
