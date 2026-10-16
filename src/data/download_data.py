@@ -150,6 +150,7 @@ def download_dataset(
     license_name: str | None = None,
     backend: str = "datasets",
     page_size: int = 100,
+    page_delay: float = 0.25,
 ) -> dict[str, Any]:
     """Stream *dataset* to JSONL and return the written metadata.
 
@@ -190,6 +191,7 @@ def download_dataset(
                         max_records=max_records,
                         max_tokens=max_tokens,
                         page_size=page_size,
+                        page_delay=page_delay,
                     )
                 else:
                     stream = _load_stream(dataset, config=config, split=split, revision=revision)
@@ -267,6 +269,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Streaming backend. viewer_api avoids signed object-storage downloads on restricted networks.",
     )
     parser.add_argument("--page-size", type=int, default=100, help="Viewer API rows per request (maximum 100).")
+    parser.add_argument("--page-delay", type=float, default=0.25, help="Seconds between Dataset Viewer requests.")
     parser.add_argument("--output-dir", required=True, help="Directory for raw.jsonl and metadata.json.")
     parser.add_argument("--max-records", type=int, help="Stop after this many records; useful for smoke tests.")
     parser.add_argument(
@@ -303,6 +306,7 @@ def main(argv: list[str] | None = None) -> int:
         license_name=args.license_name,
         backend=args.backend,
         page_size=args.page_size,
+        page_delay=args.page_delay,
     )
     print(json.dumps(metadata, ensure_ascii=False, indent=2, sort_keys=True))
     return 0
