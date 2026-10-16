@@ -20,6 +20,7 @@ FINEWEB_EDU_LICENSE="${FINEWEB_EDU_LICENSE:-}"
 DOWNLOAD_BACKEND="${DOWNLOAD_BACKEND:-viewer_api}"
 VIEWER_PAGE_DELAY="${VIEWER_PAGE_DELAY:-0.25}"
 DOWNLOAD_RETRIES="${DOWNLOAD_RETRIES:-10}"
+DOWNLOAD_RESUME="${DOWNLOAD_RESUME:-1}"
 
 download_args=()
 if [[ -n "${MAX_RECORDS}" ]]; then
@@ -29,6 +30,8 @@ fineweb_license_args=()
 fineweb_edu_license_args=()
 if [[ -n "${FINEWEB_LICENSE}" ]]; then fineweb_license_args+=(--license "${FINEWEB_LICENSE}"); fi
 if [[ -n "${FINEWEB_EDU_LICENSE}" ]]; then fineweb_edu_license_args+=(--license "${FINEWEB_EDU_LICENSE}"); fi
+resume_args=()
+if [[ "${DOWNLOAD_RESUME}" == "1" ]]; then resume_args+=(--resume); fi
 
 python -m src.data.download_data \
   --dataset HuggingFaceFW/fineweb \
@@ -38,6 +41,7 @@ python -m src.data.download_data \
   --backend "${DOWNLOAD_BACKEND}" \
   --page-delay "${VIEWER_PAGE_DELAY}" \
   --retries "${DOWNLOAD_RETRIES}" \
+  "${resume_args[@]}" \
   --output-dir "${RAW_ROOT}/fineweb" \
   --max-tokens "${FINEWEB_TOKEN_BUDGET}" \
   "${download_args[@]}" "${fineweb_license_args[@]}"
@@ -50,6 +54,7 @@ python -m src.data.download_data \
   --backend "${DOWNLOAD_BACKEND}" \
   --page-delay "${VIEWER_PAGE_DELAY}" \
   --retries "${DOWNLOAD_RETRIES}" \
+  "${resume_args[@]}" \
   --output-dir "${RAW_ROOT}/fineweb-edu" \
   --max-tokens "${FINEWEB_EDU_TOKEN_BUDGET}" \
   "${download_args[@]}" "${fineweb_edu_license_args[@]}"
