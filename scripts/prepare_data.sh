@@ -8,6 +8,8 @@ RAW_ROOT="${RAW_ROOT:-data/raw/general}"
 PROCESSED_ROOT="${PROCESSED_ROOT:-data/processed/general}"
 TOKEN_ROOT="${TOKEN_ROOT:-data/tokenized/general}"
 TOKEN_BUDGET="${TOKEN_BUDGET:-100000000}"
+FINEWEB_TOKEN_BUDGET="${FINEWEB_TOKEN_BUDGET:-70000000}"
+FINEWEB_EDU_TOKEN_BUDGET="${FINEWEB_EDU_TOKEN_BUDGET:-30000000}"
 MAX_RECORDS="${MAX_RECORDS:-}"
 FINEWEB_CONFIG="${FINEWEB_CONFIG:-sample-10BT}"
 FINEWEB_EDU_CONFIG="${FINEWEB_EDU_CONFIG:-sample-10BT}"
@@ -28,6 +30,7 @@ python -m src.data.download_data \
   --config "${FINEWEB_CONFIG}" \
   --split train \
   --output-dir "${RAW_ROOT}/fineweb" \
+  --max-tokens "${FINEWEB_TOKEN_BUDGET}" \
   "${download_args[@]}" "${fineweb_license_args[@]}"
 
 python -m src.data.download_data \
@@ -35,6 +38,7 @@ python -m src.data.download_data \
   --config "${FINEWEB_EDU_CONFIG}" \
   --split train \
   --output-dir "${RAW_ROOT}/fineweb-edu" \
+  --max-tokens "${FINEWEB_EDU_TOKEN_BUDGET}" \
   "${download_args[@]}" "${fineweb_edu_license_args[@]}"
 
 python -m src.data.merge_raw --input-dir "${RAW_ROOT}" --output-dir "${RAW_ROOT}/merged"

@@ -54,6 +54,7 @@ def download_dataset(
     split: str = "train",
     revision: str | None = None,
     max_records: int | None = None,
+    max_tokens: int | None = None,
     retries: int = 3,
     retry_delay: float = 2.0,
     sample_size: int = 32,
@@ -70,6 +71,8 @@ def download_dataset(
         raise ValueError("retries must be at least 1")
     if max_records is not None and max_records < 1:
         raise ValueError("max_records must be positive when provided")
+    if max_tokens is not None and max_tokens < 1:
+        raise ValueError("max_tokens must be positive when provided")
     if sample_size < 1:
         raise ValueError("sample_size must be positive")
 
@@ -83,6 +86,7 @@ def download_dataset(
         try:
             temporary_path.unlink(missing_ok=True)
             count = 0
+            token_count = 0
             sample: list[dict[str, Any]] = []
             with temporary_path.open("w", encoding="utf-8") as handle:
                 stream = _load_stream(dataset, config=config, split=split, revision=revision)
@@ -92,9 +96,16 @@ def download_dataset(
                     materialized = dict(record)
                     handle.write(json.dumps(materialized, ensure_ascii=False, default=str) + "\n")
                     count += 1
+                    record_tokens = materialized.get("token_count")
+                    if not isinstance(record_tokens, (int, float)) or record_tokens <= 0:
+                        text = materialized.get("text", "")
+                        record_tokens = max(1, round(len(text) / 4)) if isinstance(text, str) else 1
+                    token_count += int(record_tokens)
                     if len(sample) < sample_size:
                         sample.append(materialized)
                     if max_records is not None and count >= max_records:
+                        break
+                    if max_tokens is not None and token_count >= max_tokens:
                         break
             temporary_path.replace(output_path)
             metadata = {
@@ -110,6 +121,8 @@ def download_dataset(
                 "sample_size": len(sample),
                 "schema": detect_schema(sample),
                 "max_records": max_records,
+                "max_tokens": max_tokens,
+                "token_count_from_records": token_count,
                 "attempts": attempt,
             }
             write_json(destination / "metadata.json", metadata)
@@ -140,6 +153,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--revision", help="Optional dataset branch, tag, or commit.")
     parser.add_argument("--output-dir", required=True, help="Directory for raw.jsonl and metadata.json.")
     parser.add_argument("--max-records", type=int, help="Stop after this many records; useful for smoke tests.")
+    parser.add_argument(
+        "--max-tokens",
+        type=int,
+        help="Stop after approximately this many source token_count values; falls back to characters/4.",
+    )
     parser.add_argument("--retries", type=int, default=3, help="Total streaming attempts.")
     parser.add_argument("--retry-delay", type=float, default=2.0, help="Initial retry delay in seconds; doubles per attempt.")
     parser.add_argument("--sample-size", type=int, default=32, help="Number of records used for schema detection.")
@@ -162,6 +180,7 @@ def main(argv: list[str] | None = None) -> int:
         split=args.split,
         revision=args.revision,
         max_records=args.max_records,
+        max_tokens=args.max_tokens,
         retries=args.retries,
         retry_delay=args.retry_delay,
         sample_size=args.sample_size,

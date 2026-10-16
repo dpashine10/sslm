@@ -81,6 +81,7 @@ def test_download_writes_raw_jsonl_metadata_and_retries(tmp_path: Path, monkeypa
     )
     assert attempts["count"] == 2
     assert metadata["record_count"] == 4
+    assert metadata["token_count_from_records"] > 0
     assert metadata["schema"]["kind"] == "conversation"
     assert len((tmp_path / "raw.jsonl").read_text(encoding="utf-8").splitlines()) == 4
     assert json.loads((tmp_path / "metadata.json").read_text(encoding="utf-8"))["attempts"] == 2
