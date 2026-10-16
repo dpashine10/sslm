@@ -57,6 +57,7 @@ def _load_viewer_rows(
     page_retries: int = 5,
     timeout: float = 120.0,
     page_delay: float = 0.05,
+    start_offset: int = 0,
 ) -> Iterable[Mapping[str, Any]]:
     """Read public rows through the Hugging Face Dataset Viewer API.
 
@@ -81,7 +82,7 @@ def _load_viewer_rows(
             "Accept": "application/json",
         }
     )
-    offset = 0
+    offset = start_offset
     records = 0
     tokens = 0
     while True:
@@ -157,6 +158,7 @@ def download_dataset(
     backend: str = "datasets",
     page_size: int = 100,
     page_delay: float = 0.25,
+    resume: bool = False,
 ) -> dict[str, Any]:
     """Stream *dataset* to JSONL and return the written metadata.
 
@@ -184,24 +186,58 @@ def download_dataset(
 
     for attempt in range(1, retries + 1):
         try:
-            temporary_path.unlink(missing_ok=True)
-            count = 0
-            token_count = 0
-            sample: list[dict[str, Any]] = []
-            with temporary_path.open("w", encoding="utf-8") as handle:
-                if backend == "viewer_api":
+            existing_count = 0
+            existing_tokens = 0
+            existing_sample: list[dict[str, Any]] = []
+            append_existing = resume and backend == "viewer_api" and temporary_path.is_file()
+            if append_existing:
+                with temporary_path.open("r", encoding="utf-8") as existing_handle:
+                    for line in existing_handle:
+                        if not line.strip():
+                            continue
+                        try:
+                            existing_record = json.loads(line)
+                        except json.JSONDecodeError:
+                            break
+                        if not isinstance(existing_record, Mapping):
+                            break
+                        existing_count += 1
+                        if len(existing_sample) < sample_size:
+                            existing_sample.append(dict(existing_record))
+                        record_tokens = existing_record.get("token_count")
+                        if not isinstance(record_tokens, (int, float)) or record_tokens <= 0:
+                            text = existing_record.get("text", "")
+                            record_tokens = max(1, round(len(text) / 4)) if isinstance(text, str) else 1
+                        existing_tokens += int(record_tokens)
+            else:
+                temporary_path.unlink(missing_ok=True)
+            count = existing_count
+            token_count = existing_tokens
+            sample: list[dict[str, Any]] = existing_sample
+            with temporary_path.open("a" if append_existing else "w", encoding="utf-8") as handle:
+                budget_exhausted = (max_records is not None and count >= max_records) or (
+                    max_tokens is not None and token_count >= max_tokens
+                )
+                if budget_exhausted:
+                    stream = ()
+                elif backend == "viewer_api":
                     stream = _load_viewer_rows(
                         dataset,
                         config=config,
                         split=split,
-                        max_records=max_records,
-                        max_tokens=max_tokens,
+                        max_records=(max_records - existing_count) if max_records is not None else None,
+                        max_tokens=(max_tokens - existing_tokens) if max_tokens is not None else None,
                         page_size=page_size,
                         page_delay=page_delay,
+                        start_offset=existing_count,
                     )
                 else:
                     stream = _load_stream(dataset, config=config, split=split, revision=revision)
                 for record in stream:
+                    if max_records is not None and count >= max_records:
+                        break
+                    if max_tokens is not None and token_count >= max_tokens:
+                        break
                     if not isinstance(record, Mapping):
                         raise ValueError(f"Dataset yielded a non-object record: {type(record).__name__}")
                     materialized = dict(record)
@@ -246,10 +282,12 @@ def download_dataset(
             return metadata
         except Exception as exc:  # retry transient network/iterator failures
             last_error = exc
-            temporary_path.unlink(missing_ok=True)
+            if not (resume and backend == "viewer_api"):
+                temporary_path.unlink(missing_ok=True)
             if attempt >= retries:
                 raise RuntimeError(
-                    f"Unable to stream {dataset!r} after {retries} attempt(s): {exc}"
+                    f"Unable to stream {dataset!r} after {retries} attempt(s): {exc}. "
+                    + (f"Partial data is resumable at {temporary_path}. " if resume else "")
                 ) from exc
             if retry_delay:
                 time.sleep(retry_delay * (2 ** (attempt - 1)))
@@ -276,6 +314,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--page-size", type=int, default=100, help="Viewer API rows per request (maximum 100).")
     parser.add_argument("--page-delay", type=float, default=0.25, help="Seconds between Dataset Viewer requests.")
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume a Dataset Viewer download from raw.jsonl.part after a network interruption.",
+    )
     parser.add_argument("--output-dir", required=True, help="Directory for raw.jsonl and metadata.json.")
     parser.add_argument("--max-records", type=int, help="Stop after this many records; useful for smoke tests.")
     parser.add_argument(
@@ -313,6 +356,7 @@ def main(argv: list[str] | None = None) -> int:
         backend=args.backend,
         page_size=args.page_size,
         page_delay=args.page_delay,
+        resume=args.resume,
     )
     print(json.dumps(metadata, ensure_ascii=False, indent=2, sort_keys=True))
     return 0

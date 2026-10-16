@@ -87,6 +87,44 @@ def test_download_writes_raw_jsonl_metadata_and_retries(tmp_path: Path, monkeypa
     assert json.loads((tmp_path / "metadata.json").read_text(encoding="utf-8"))["attempts"] == 2
 
 
+def test_viewer_download_can_resume_a_partial_page_stream(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import src.data.download_data as download_module
+
+    first_rows = [{"text": f"document {index}", "token_count": 10} for index in range(3)]
+    second_rows = [{"text": f"document {index}", "token_count": 10} for index in range(3, 5)]
+    calls: list[int] = []
+
+    def failing_viewer(*args, **kwargs):
+        calls.append(int(kwargs["start_offset"]))
+        if len(calls) == 1:
+            yield from first_rows
+            raise OSError("interrupted after a complete page")
+        yield from second_rows
+
+    monkeypatch.setattr(download_module, "_load_viewer_rows", failing_viewer)
+    with pytest.raises(RuntimeError, match="resumable"):
+        download_dataset(
+            "local-viewer",
+            tmp_path,
+            backend="viewer_api",
+            max_tokens=50,
+            retries=1,
+            resume=True,
+        )
+    assert (tmp_path / "raw.jsonl.part").is_file()
+    metadata = download_dataset(
+        "local-viewer",
+        tmp_path,
+        backend="viewer_api",
+        max_tokens=50,
+        retries=1,
+        resume=True,
+    )
+    assert calls == [0, 3]
+    assert metadata["record_count"] == 5
+    assert not (tmp_path / "raw.jsonl.part").exists()
+
+
 def test_prepare_data_is_deterministic_and_filters_duplicates(tmp_path: Path) -> None:
     first_dir = tmp_path / "first"
     second_dir = tmp_path / "second"
