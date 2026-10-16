@@ -1,0 +1,29 @@
+.venv/
+__pycache__/
+*.egg-info/
+*.py[cod]
+.pytest_cache/
+.coverage
+.mypy_cache/
+.ruff_cache/
+.env
+
+# Generated data and model artifacts
+data/raw/
+data/processed/
+data/tokenized/
+outputs/checkpoints/
+outputs/*.pt
+outputs/*.safetensors
+outputs/reports/
+*.bin
+*.jsonl
+*.npz
+
+# Checked-in offline test fixtures
+!tests/fixtures/
+!tests/fixtures/*.jsonl
+
+# Local notebook/runtime files
+.ipynb_checkpoints/
+kaggle_working/

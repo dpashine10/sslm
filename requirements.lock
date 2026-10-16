@@ -1,0 +1,10 @@
+# Top-level runtime and development pins for Python 3.11.
+# The project package metadata remains range-compatible for local development;
+# Docker uses these exact versions for a reproducible base environment.
+datasets==2.19.2
+numpy==1.26.4
+PyYAML==6.0.2
+torch==2.2.2
+tokenizers==0.19.1
+tqdm==4.66.5
+pytest==8.3.5

@@ -1,0 +1,9 @@
+# CPU installs are suitable for local tests. Kaggle should use its preinstalled
+# CUDA-enabled PyTorch and install the remaining packages below if needed.
+torch>=2.2,<2.8
+numpy>=1.26,<3
+PyYAML>=6.0,<7
+tqdm>=4.66,<5
+tokenizers>=0.19,<1
+datasets>=2.19,<4
+pytest>=8,<9

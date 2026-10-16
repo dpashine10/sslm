@@ -1,0 +1,7 @@
+{"instruction": "Give a concise greeting.", "context": "", "response": "Hello there."}
+{"messages": [{"role": "system", "content": "You are concise."}, {"role": "user", "content": "List two fruits."}, {"role": "assistant", "content": "Apple and pear."}]}
+{"conversations": [{"from": "human", "value": "What is 2 + 2?"}, {"from": "gpt", "value": "Four."}, {"from": "human", "value": "And 3 + 3?"}, {"from": "gpt", "value": "Six."}]}
+{"instruction": "Give a concise greeting.", "context": "", "response": "Hello there."}
+{"messages": [{"role": "assistant", "content": "This has no user turn."}]}
+{"messages": [{"role": "user", "content": "This has no answer."}]}
+malformed sft json

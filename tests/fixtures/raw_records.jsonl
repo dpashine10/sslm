@@ -1,0 +1,10 @@
+{"text": "  Alpha\ttraining document.  "}
+{"content": "Beta document with a second source field."}
+{"instruction": "Explain a small language model.", "response": "It predicts the next token from context."}
+{"messages": [{"role": "user", "content": "Name a color."}, {"role": "assistant", "content": "Blue."}]}
+{"text": "Duplicate source document."}
+{"text": "Duplicate   source document."}
+{"text": "x"}
+{"text": ""}
+this is intentionally malformed json
+["a", "non-object"]

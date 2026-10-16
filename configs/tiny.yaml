@@ -1,0 +1,46 @@
+# Offline smoke-test configuration. It has no data dependency for --dry-run.
+seed: 1234
+device: auto
+precision: auto
+output_dir: outputs/checkpoints/tiny
+
+model:
+  vocab_size: null
+  d_model: 64
+  n_layers: 2
+  d_state: 8
+  d_conv: 4
+  expand: 2
+  max_seq_len: 64
+  dropout: 0.0
+  tie_embeddings: true
+
+dry_run_vocab_size: 256
+
+training:
+  block_size: 32
+  batch_size: 2
+  gradient_accumulation_steps: 1
+  max_steps: 10
+  max_tokens: 640
+  learning_rate: 0.0003
+  weight_decay: 0.1
+  warmup_steps: 2
+  gradient_clip_norm: 1.0
+  log_interval_steps: 1
+  eval_interval_steps: 5
+  checkpoint_interval_steps: 5
+  generation_interval_steps: 5
+  keep_checkpoints: 2
+  resume: false
+
+data:
+  token_manifest: data/tokenized/tiny/tokens
+
+generation:
+  tokenizer: data/tokenized/tiny/tokenizer.json
+  max_new_tokens: 32
+  temperature: 0.8
+  top_k: 20
+  top_p: 0.95
+  do_sample: false

@@ -1,0 +1,46 @@
+# Approximately 50M parameters with a 16k--32k tokenizer. Set vocab_size to
+# null so it is read from data.token_manifest after tokenization.
+seed: 1234
+device: auto
+precision: auto
+output_dir: outputs/checkpoints/base_50m
+
+model:
+  vocab_size: null
+  d_model: 480
+  n_layers: 12
+  d_state: 16
+  d_conv: 4
+  expand: 2
+  max_seq_len: 512
+  dropout: 0.0
+  tie_embeddings: true
+
+training:
+  block_size: 512
+  batch_size: 8
+  gradient_accumulation_steps: 8
+  max_tokens: 100000000
+  max_steps: null
+  learning_rate: 0.0003
+  weight_decay: 0.1
+  warmup_steps: 500
+  gradient_clip_norm: 1.0
+  log_interval_steps: 10
+  eval_interval_steps: 250
+  validation_batches: 50
+  checkpoint_interval_steps: 250
+  generation_interval_steps: 500
+  keep_checkpoints: 3
+  resume: true
+
+data:
+  token_manifest: data/tokenized/general/tokens
+
+generation:
+  tokenizer: data/tokenized/general/tokenizer.json
+  max_new_tokens: 96
+  temperature: 0.8
+  top_k: 50
+  top_p: 0.95
+  do_sample: true
