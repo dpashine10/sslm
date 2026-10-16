@@ -75,6 +75,12 @@ def _load_viewer_rows(
         raise ValueError("page_size must be in [1, 100]")
     base_url = "https://datasets-server.huggingface.co/rows"
     session = requests.Session()
+    session.headers.update(
+        {
+            "User-Agent": "small-ssm-lm-data-preparer/0.1 (+https://huggingface.co/datasets/HuggingFaceFW/fineweb)",
+            "Accept": "application/json",
+        }
+    )
     offset = 0
     records = 0
     tokens = 0
