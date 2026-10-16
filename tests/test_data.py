@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from src.data.download_data import download_dataset
+from src.data.common import clean_text
 from src.data.prepare_data import prepare_data
 from src.data.prepare_sft import prepare_sft
 from src.data.schemas import detect_schema, normalize_messages
@@ -45,6 +46,12 @@ def test_schema_detection_and_message_normalization() -> None:
         {"role": "user", "content": "first\n\nsecond"},
         {"role": "assistant", "content": "answer"},
     ]
+
+
+def test_clean_text_preserves_paragraph_boundaries() -> None:
+    assert clean_text(" first line\nsecond line\n\n  next paragraph \n") == (
+        "first line second line\n\nnext paragraph"
+    )
 
 
 def test_download_writes_raw_jsonl_metadata_and_retries(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

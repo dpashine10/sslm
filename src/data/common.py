@@ -12,7 +12,8 @@ from pathlib import Path
 from typing import Any, Iterable, Iterator, Mapping
 
 
-WHITESPACE_RE = re.compile(r"\s+")
+WHITESPACE_RE = re.compile(r"[ \t\f\v]+")
+PARAGRAPH_RE = re.compile(r"\n\s*\n+")
 
 
 def json_default(value: Any) -> Any:
@@ -91,8 +92,14 @@ def clean_text(value: Any) -> str:
     if not isinstance(value, str):
         value = str(value)
     value = unicodedata.normalize("NFKC", value)
-    value = value.replace("\x00", " ")
-    return WHITESPACE_RE.sub(" ", value).strip()
+    value = value.replace("\x00", " ").replace("\r\n", "\n").replace("\r", "\n")
+    paragraphs: list[str] = []
+    for paragraph in PARAGRAPH_RE.split(value):
+        lines = [WHITESPACE_RE.sub(" ", line).strip() for line in paragraph.split("\n")]
+        normalized = " ".join(line for line in lines if line)
+        if normalized:
+            paragraphs.append(normalized)
+    return "\n\n".join(paragraphs)
 
 
 def canonical_json(value: Any) -> str:
