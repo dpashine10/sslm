@@ -23,9 +23,12 @@ cp -a "${TOKENIZED}" "${OUTPUT}/data/tokenized/local_100m"
 git -C "${ROOT}" rev-parse HEAD > "${OUTPUT}/SOURCE_COMMIT"
 {
   printf '# SHA-256 checksums for the uploaded tokenized dataset\n'
-  find "${OUTPUT}/data/tokenized/local_100m" -type f -print0 \
-    | sort -z \
-    | xargs -0 sha256sum
+  (
+    cd "${OUTPUT}"
+    find data/tokenized/local_100m -type f ! -name SHA256SUMS -print0 \
+      | sort -z \
+      | xargs -0 sha256sum
+  )
 } > "${OUTPUT}/data/tokenized/local_100m/SHA256SUMS"
 
 echo "Created Kaggle bundle: ${OUTPUT}"
