@@ -33,6 +33,33 @@ from .common import (
 from .schemas import record_to_text
 
 
+BOILERPLATE_PHRASES = (
+    "enable javascript to continue",
+    "please enable javascript",
+    "accept cookies to continue",
+    "cookie policy",
+    "privacy policy",
+    "terms of service",
+)
+
+
+def is_obvious_boilerplate(text: str) -> bool:
+    """Reject short pages that are mostly repeated consent/navigation text.
+
+    This intentionally stays conservative: a single mention of a privacy policy
+    in a real article is retained, while several boilerplate phrases in a short
+    document are discarded.
+    """
+
+    if len(text) < 10_000:
+        lower = text.casefold()
+        phrase_hits = sum(lower.count(phrase) for phrase in BOILERPLATE_PHRASES)
+        if phrase_hits >= 2:
+            return True
+    compact = "".join(character for character in text if not character.isspace())
+    return len(compact) >= 80 and len(set(compact)) <= 5
+
+
 class _ShardWriter:
     """Write one split to bounded JSONL shards."""
 
@@ -104,6 +131,7 @@ def prepare_data(
     max_chars: int | None = None,
     shard_size: int = 100_000,
     dedupe: bool = True,
+    boilerplate_filter: bool = True,
 ) -> dict[str, Any]:
     """Prepare generic text data and return its manifest."""
 
@@ -144,6 +172,9 @@ def prepare_data(
             if max_chars is not None and len(text) > max_chars:
                 stats["filtered_too_long"] += 1
                 continue
+            if boilerplate_filter and is_obvious_boilerplate(text):
+                stats["filtered_boilerplate"] += 1
+                continue
             digest = stable_hash(text, seed)
             if dedupe and digest in seen:
                 stats["duplicates"] += 1
@@ -176,6 +207,7 @@ def prepare_data(
             "max_chars": max_chars,
             "shard_size": shard_size,
             "dedupe": dedupe,
+            "boilerplate_filter": boilerplate_filter,
         },
         "stats": {
             **dict(stats),
@@ -209,6 +241,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-chars", type=int, help="Maximum cleaned text length; longer records are dropped.")
     parser.add_argument("--shard-size", type=int, default=100_000, help="Maximum records per output shard.")
     parser.add_argument("--no-dedupe", action="store_true", help="Keep duplicate cleaned records.")
+    parser.add_argument("--no-boilerplate-filter", action="store_true", help="Disable conservative boilerplate filtering.")
     return parser
 
 
@@ -225,6 +258,7 @@ def main(argv: list[str] | None = None) -> int:
         max_chars=args.max_chars,
         shard_size=args.shard_size,
         dedupe=not args.no_dedupe,
+        boilerplate_filter=not args.no_boilerplate_filter,
     )
     print(json.dumps(manifest["stats"], indent=2, sort_keys=True))
     return 0
