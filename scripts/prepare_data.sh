@@ -13,6 +13,8 @@ FINEWEB_EDU_TOKEN_BUDGET="${FINEWEB_EDU_TOKEN_BUDGET:-30000000}"
 MAX_RECORDS="${MAX_RECORDS:-}"
 FINEWEB_CONFIG="${FINEWEB_CONFIG:-sample-10BT}"
 FINEWEB_EDU_CONFIG="${FINEWEB_EDU_CONFIG:-sample-10BT}"
+FINEWEB_REVISION="${FINEWEB_REVISION:-9bb295ddab0e05d785b879661af7260fed5140fc}"
+FINEWEB_EDU_REVISION="${FINEWEB_EDU_REVISION:-87f09149ef4734204d70ed1d046ddc9ca3f2b8f9}"
 FINEWEB_LICENSE="${FINEWEB_LICENSE:-}"
 FINEWEB_EDU_LICENSE="${FINEWEB_EDU_LICENSE:-}"
 
@@ -29,6 +31,7 @@ python -m src.data.download_data \
   --dataset HuggingFaceFW/fineweb \
   --config "${FINEWEB_CONFIG}" \
   --split train \
+  --revision "${FINEWEB_REVISION}" \
   --output-dir "${RAW_ROOT}/fineweb" \
   --max-tokens "${FINEWEB_TOKEN_BUDGET}" \
   "${download_args[@]}" "${fineweb_license_args[@]}"
@@ -37,6 +40,7 @@ python -m src.data.download_data \
   --dataset HuggingFaceFW/fineweb-edu \
   --config "${FINEWEB_EDU_CONFIG}" \
   --split train \
+  --revision "${FINEWEB_EDU_REVISION}" \
   --output-dir "${RAW_ROOT}/fineweb-edu" \
   --max-tokens "${FINEWEB_EDU_TOKEN_BUDGET}" \
   "${download_args[@]}" "${fineweb_edu_license_args[@]}"
