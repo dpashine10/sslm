@@ -56,6 +56,7 @@ def _load_viewer_rows(
     page_size: int = 100,
     page_retries: int = 5,
     timeout: float = 120.0,
+    page_delay: float = 0.05,
 ) -> Iterable[Mapping[str, Any]]:
     """Read public rows through the Hugging Face Dataset Viewer API.
 
@@ -101,7 +102,12 @@ def _load_viewer_rows(
                     raise RuntimeError(
                         f"Dataset Viewer request failed at offset {offset} after {page_retries} attempts: {exc}"
                     ) from exc
-                time.sleep(min(30.0, 2**attempt))
+                retry_after = response.headers.get("Retry-After") if "response" in locals() else None
+                try:
+                    delay = float(retry_after) if retry_after else min(60.0, 2**attempt)
+                except ValueError:
+                    delay = min(60.0, 2**attempt)
+                time.sleep(delay)
         else:  # pragma: no cover
             raise RuntimeError(f"Dataset Viewer request failed: {last_error}")
         if not rows:
@@ -123,6 +129,8 @@ def _load_viewer_rows(
             if max_tokens is not None and tokens >= max_tokens:
                 return
         offset += len(rows)
+        if page_delay:
+            time.sleep(page_delay)
         if len(rows) < page_size:
             break
 
